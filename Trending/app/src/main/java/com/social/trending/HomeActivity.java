@@ -2,12 +2,17 @@ package com.social.trending;
 
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Looper;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.design.widget.NavigationView;
 import android.support.v4.app.ActivityCompat;
@@ -50,6 +55,7 @@ public class HomeActivity extends AppCompatActivity implements
     GoogleApiClient mGoogleApiClient;
     LocationRequest mLocationRequest;
     public static Location mLocation;
+    LocationManager mLocationservice;
 
     public static ArrayList<TrendDetail> TrendList = new ArrayList<>();
     public static final String TAG = "HOME_ACTIVITY";
@@ -57,6 +63,7 @@ public class HomeActivity extends AppCompatActivity implements
     public static SwipeRefreshLayout swipeRefreshLayout;
     public static TrendsListAdapter myTrendsAdapter;
     public static RecyclerView recyclerView;
+
 
     private static final int REQUEST_CODE_PERMISSION_ALL = 1;
     private static String[] PERMISSIONS_LOCATION = {
@@ -93,14 +100,17 @@ public class HomeActivity extends AppCompatActivity implements
         recyclerView.setAdapter(myTrendsAdapter);
 
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-
+        mLocationservice = (LocationManager) getSystemService(LOCATION_SERVICE);
 
         swipeRefreshLayout.setOnRefreshListener(this);
         swipeRefreshLayout.post(new Runnable() {
                                     @Override
                                     public void run() {
                                         if(!swipeRefreshLayout.isRefreshing()){
-                                            //fetchAndRefreshTrends(ARROUND_ME);
+                                            if ( mLocation == null){
+                                                requestLocationUpdates();
+                                            }
+                                            fetchAndRefreshTrends(ARROUND_ME);
                                         }
 
                                     }
@@ -117,10 +127,23 @@ public class HomeActivity extends AppCompatActivity implements
     public void onResume() {
 
         super.onResume();
-        if (mGoogleApiClient != null && mFusedLocationClient != null) {
-            requestLocationUpdates();
-        } else {
+        boolean gps_enabled = mLocationservice.isProviderEnabled(
+                LocationManager.GPS_PROVIDER);
+        boolean nw_enabled = mLocationservice.isProviderEnabled(
+                LocationManager.NETWORK_PROVIDER);
+
+        // check if enabled and if not send user to the GSP settings
+        if (!gps_enabled && !nw_enabled) {
+            showSettingsPermissionDialog();
+            return;
+        }
+        if (mGoogleApiClient == null) {
             buildGoogleApiClient();
+            return;
+        }
+
+        if (mGoogleApiClient != null && mFusedLocationClient != null ){
+            requestLocationUpdates();
         }
     }
     protected synchronized void buildGoogleApiClient() {
@@ -140,6 +163,35 @@ public class HomeActivity extends AppCompatActivity implements
     public void onConnectionSuspended(int i) {
 
     }
+    private void showSettingsPermissionDialog(){
+        AlertDialog.Builder adBuilder = new AlertDialog.Builder(this);
+        adBuilder.setMessage("For best user experience we need to know current location.\nPlease enable location service!");
+        adBuilder.setCancelable(true);
+        adBuilder.setPositiveButton(
+                "OK",
+                new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+                        Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                        startActivity(intent);
+                    }
+                });
+        AlertDialog alert = adBuilder.create();
+        alert.show();
+    }
+
+    void showLocationNoFoundDialog(){
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setMessage("Not able to find current location. Please check settings!")
+                .setCancelable(false)
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int id) {
+                        Intent intent = new Intent(getApplicationContext(), HomeActivity.class);
+                        startActivityForResult(intent, 0);
+                    }
+                });
+        AlertDialog alert = builder.create();
+        alert.show();
+    }
 
     @Override
     public void onBackPressed() {
@@ -154,7 +206,7 @@ public class HomeActivity extends AppCompatActivity implements
     public void requestLocationUpdates() {
         mLocationRequest = new LocationRequest();
         mLocationRequest.setInterval(30000); // 5 minute interval
-        mLocationRequest.setFastestInterval(120000);
+        mLocationRequest.setFastestInterval(60000);
         mLocationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
 
         if (ContextCompat.checkSelfPermission(this,
@@ -183,7 +235,9 @@ public class HomeActivity extends AppCompatActivity implements
         public synchronized void onLocationResult(LocationResult locationResult) {
             for (Location location : locationResult.getLocations()) {
                 mLocation = location;
-                fetchAndRefreshTrends(ARROUND_ME);
+                if (location != null) {
+                    fetchAndRefreshTrends(ARROUND_ME);
+                }
             }
         };
 
@@ -197,11 +251,13 @@ public class HomeActivity extends AppCompatActivity implements
         }
     }
     static synchronized void UpdateAdapter(){
-
             myTrendsAdapter.notifyDataSetChanged();
     }
     void fetchAndRefreshTrends(int where){
-        new NetworkAsyncTask(getApplicationContext(), where).execute();
+
+        if (!NetworkAsyncTask.isRunning) {
+            new NetworkAsyncTask(getApplicationContext(), where).execute();
+        }
     }
     @Override
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {

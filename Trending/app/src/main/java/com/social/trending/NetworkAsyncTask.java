@@ -15,12 +15,14 @@ public class NetworkAsyncTask extends AsyncTask<String, Integer, String> {
 
     public static String TAG = "NetworkAsyncTask";
     public int GET_TRENDS_FOR = 0;
+    public static boolean isRunning;
     @Override
     public void onPreExecute() {
 
         //Clear stale trend list.
         HomeActivity.ClearAdapter();
         HomeActivity.swipeRefreshLayout.setRefreshing(true);
+        isRunning = true;
     }
     private Context mContext;
 
@@ -77,6 +79,7 @@ public class NetworkAsyncTask extends AsyncTask<String, Integer, String> {
 
     @Override
     public void onPostExecute(String result) {
+        isRunning = false;
         HomeActivity.UpdateAdapter();
         HomeActivity.swipeRefreshLayout.setRefreshing(false);
 
