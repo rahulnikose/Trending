@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Trending</string>
+    <string name="CONSUMER_KEY">Ke9NwpCcakwfGqSMpX2ycTZRi</string>
+    <string name="CONSUMER_SECRET">LgDs09SiqjJ4V6solYXOQW7kt0KWrLXoG1cbyCIt63W0cRThvS</string>
+    <string name="title_activity_home">Home</string>
+
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+
+    <string name="action_settings">Settings</string>
+</resources>
